@@ -13,86 +13,224 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { X } from "lucide-react"
-import { destinationsApi, ethiopianRegions, destinationCategories, statusOptions } from "@/lib/api-destinations"
+import { X, Upload } from "lucide-react"
+import { destinationsApi, ethiopianRegions, destinationCategories, statusOptions, formatDestinationData } from "@/lib/api-destinations"
 
-// Fallback ImageUpload component (based on NewPackagePage behavior)
+// Single Image Upload Component
 const ImageUpload: React.FC<{
   onUploadComplete: (url: string) => void
   label: string
-}> = ({ onUploadComplete, label }) => {
+  initialImage?: string
+}> = ({ onUploadComplete, label, initialImage }) => {
+  const { toast } = useToast()
+  const [image, setImage] = useState<string>(initialImage || "")
+  const [isUploading, setIsUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
+    setIsUploading(true)
+
     try {
-      // Replace with your actual upload service (e.g., Cloudinary, S3)
-      const url = URL.createObjectURL(file) // Placeholder
+      const formData = new FormData()
+      formData.append("image", file)
+      formData.append("folder", "ethiopian-travel")
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to upload image")
+      }
+
+      const { url } = await response.json()
+      setImage(url)
       onUploadComplete(url)
+
+      toast({
+        title: "Main image uploaded",
+        variant: "success",
+      })
     } catch (error) {
       console.error("Image upload failed:", error)
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload image",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
     }
   }
 
+  const handleRemove = () => {
+    setImage("")
+    onUploadComplete("")
+  }
+
   return (
-    <div>
-      <Label>{label}</Label>
-      <input type="file" ref={inputRef} accept="image/*" onChange={handleUpload} className="hidden" />
-      <Button type="button" onClick={() => inputRef.current?.click()}>
-        {label}
-      </Button>
+    <div className="space-y-2">
+      {image ? (
+        <div className="relative h-40 w-full overflow-hidden rounded-md border">
+          <img src={image || "/placeholder.svg"} alt="Main destination image" className="h-full w-full object-cover" />
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute right-2 top-2 h-6 w-6 rounded-full"
+            onClick={handleRemove}
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div
+          className="flex h-40 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed"
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">JPEG, PNG, GIF, SVG, WebP (max 5MB)</p>
+          {isUploading && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="text-xs">Uploading...</span>
+            </div>
+          )}
+        </div>
+      )}
+      <input
+        type="file"
+        ref={inputRef}
+        accept="image/jpeg,image/png,image/gif,image/svg+xml,image/webp"
+        onChange={handleUpload}
+        className="hidden"
+        disabled={isUploading}
+      />
     </div>
   )
 }
 
-// Fallback MultipleImageUpload component (based on NewPackagePage behavior)
+// Multiple Image Upload Component
 const MultipleImageUpload: React.FC<{
   onUploadComplete: (urls: string[]) => void
   label: string
   maxFiles: number
-}> = ({ onUploadComplete, label, maxFiles }) => {
+  initialImages?: string[]
+}> = ({ onUploadComplete, label, maxFiles, initialImages = [] }) => {
+  const { toast } = useToast()
+  const [images, setImages] = useState<string[]>(initialImages)
+  const [isUploading, setIsUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
+    if (!files || files.length === 0) return
 
-    const urls: string[] = []
-    for (const file of Array.from(files)) {
-      try {
-        // Replace with your actual upload service
-        const url = URL.createObjectURL(file) // Placeholder
-        urls.push(url)
-      } catch (error) {
-        console.error("Image upload failed:", error)
+    setIsUploading(true)
+
+    try {
+      const formData = new FormData()
+      Array.from(files)
+        .slice(0, maxFiles - images.length)
+        .forEach((file) => formData.append("files", file))
+      formData.append("folder", "ethiopian-travel")
+
+      const response = await fetch("/api/upload/multiple", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to upload images")
       }
-    }
-    if (urls.length > 0) {
-      onUploadComplete(urls)
+
+      const { urls } = await response.json()
+      const updatedImages = [...images, ...urls]
+      setImages(updatedImages)
+      onUploadComplete(updatedImages)
+
+      toast({
+        title: `${urls.length} image(s) uploaded`,
+        variant: "success",
+      })
+    } catch (error) {
+      console.error("Image upload failed:", error)
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload images",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+      if (inputRef.current) inputRef.current.value = ""
     }
   }
 
+  const handleRemove = (index: number) => {
+    const updatedImages = images.filter((_, i) => i !== index)
+    setImages(updatedImages)
+    onUploadComplete(updatedImages)
+  }
+
   return (
-    <div>
-      <Label>{label}</Label>
+    <div className="space-y-4">
+      {images.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {images.map((image, index) => (
+            <div key={index} className="relative aspect-square overflow-hidden rounded-md border">
+              <img src={image || "/placeholder.svg"} alt={`Gallery ${index + 1}`} className="h-full w-full object-cover" />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute right-1 top-1 h-5 w-5 rounded-full"
+                onClick={() => handleRemove(index)}
+                type="button"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {images.length < maxFiles && (
+        <div
+          className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed"
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">{images.length}/{maxFiles} images</p>
+          {isUploading && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="text-xs">Uploading...</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <input
         type="file"
         ref={inputRef}
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/svg+xml,image/webp"
         multiple
         onChange={handleUpload}
         className="hidden"
-        disabled={maxFiles <= 0}
+        disabled={isUploading || images.length >= maxFiles}
       />
-      <Button type="button" onClick={() => inputRef.current?.click()}>
-        {label}
-      </Button>
     </div>
   )
 }
 
+// Main Component
 export default function NewDestinationPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -140,28 +278,10 @@ export default function NewDestinationPage() {
 
   const handleMainImageUpload = useCallback((url: string) => {
     setMainImage(url)
-    toast({
-      title: "Main image uploaded",
-      variant: "success",
-    })
   }, [])
 
   const handleGalleryImagesUpload = useCallback((urls: string[]) => {
-    if (Array.isArray(urls) && urls.length > 0) {
-      setGalleryImages((prev) => [...prev, ...urls].slice(0, 10)) // Enforce maxFiles
-      toast({
-        title: `${urls.length} images added to gallery`,
-        variant: "success",
-      })
-    }
-  }, [])
-
-  const handleRemoveGalleryImage = useCallback((index: number) => {
-    setGalleryImages((prev) => prev.filter((_, i) => i !== index))
-    toast({
-      title: "Image removed from gallery",
-      variant: "success",
-    })
+    setGalleryImages(urls)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -175,17 +295,23 @@ export default function NewDestinationPage() {
       if (!formData.city) throw new Error("City is required")
       if (!mainImage) throw new Error("Main image is required")
 
-      // Format the data properly for the API
-      const destinationData = {
-        ...formData,
-        images: [mainImage],
-        gallery_images: galleryImages,
-      }
+      // Check for authentication token
+      const accessToken = localStorage.getItem("accessToken")
+      if (!accessToken) throw new Error("Please log in to create a destination")
 
-      console.log("Submitting destination data:", destinationData)
+      // Format the data using formatDestinationData
+      const destinationData = formatDestinationData({
+        ...formData,
+        images: mainImage ? [mainImage] : [],
+        gallery_images: galleryImages,
+      })
+
+      console.log("Submitting destination data:", JSON.stringify(destinationData, null, 2))
 
       // Send the data to the API
-      await destinationsApi.create(destinationData)
+      const response = await destinationsApi.create(destinationData)
+
+      console.log("API response:", JSON.stringify(response, null, 2))
 
       toast({
         title: "Destination created",
@@ -378,14 +504,18 @@ export default function NewDestinationPage() {
                       name="latitude"
                       value={formData.latitude}
                       onChange={handleInputChange}
-                      placeholder="Latitude (e.g. 12.0333)"
+                      placeholder="Latitude (e.g. 12.0316)"
+                      type="number"
+                      step="any"
                     />
                     <Input
                       id="longitude"
                       name="longitude"
                       value={formData.longitude}
                       onChange={handleInputChange}
-                      placeholder="Longitude (e.g. 39.0333)"
+                      placeholder="Longitude (e.g. 39.0406)"
+                      type="number"
+                      step="any"
                     />
                   </div>
                 </div>
@@ -404,26 +534,7 @@ export default function NewDestinationPage() {
                   <h3 className="text-lg font-medium">
                     Main Image <span className="text-destructive">*</span>
                   </h3>
-                  {mainImage ? (
-                    <div className="relative h-40 w-full overflow-hidden rounded-md border">
-                      <img
-                        src={mainImage || "/placeholder.svg"}
-                        alt="Main destination image"
-                        className="h-full w-full object-cover"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute right-2 top-2 h-6 w-6 rounded-full"
-                        onClick={() => setMainImage("")}
-                        type="button"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <ImageUpload onUploadComplete={handleMainImageUpload} label="Upload Main Image" />
-                  )}
+                  <ImageUpload onUploadComplete={handleMainImageUpload} label="Upload Main Image" initialImage={mainImage} />
                   <p className="text-xs text-muted-foreground">
                     This will be the primary image displayed for the destination.
                   </p>
@@ -434,37 +545,12 @@ export default function NewDestinationPage() {
                     <h3 className="text-lg font-medium">Gallery Images</h3>
                     <span className="text-sm text-muted-foreground">{galleryImages.length}/10 images</span>
                   </div>
-
-                  {galleryImages.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                      {galleryImages.map((image, index) => (
-                        <div key={index} className="relative aspect-square overflow-hidden rounded-md border">
-                          <img
-                            src={image || "/placeholder.svg"}
-                            alt={`Gallery ${index + 1}`}
-                            className="h-full w-full object-cover"
-                          />
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute right-1 top-1 h-5 w-5 rounded-full"
-                            onClick={() => handleRemoveGalleryImage(index)}
-                            type="button"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-4">
-                    <MultipleImageUpload
-                      onUploadComplete={handleGalleryImagesUpload}
-                      label="Upload Gallery Images"
-                      maxFiles={10 - galleryImages.length}
-                    />
-                  </div>
+                  <MultipleImageUpload
+                    onUploadComplete={handleGalleryImagesUpload}
+                    label="Upload Gallery Images"
+                    maxFiles={10}
+                    initialImages={galleryImages}
+                  />
                   <p className="text-xs text-muted-foreground">
                     Add up to 10 images to showcase different aspects of the destination.
                   </p>
@@ -481,7 +567,7 @@ export default function NewDestinationPage() {
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Saving...
+ NOI18N                  Saving...
                 </span>
               ) : (
                 "Save Destination"
