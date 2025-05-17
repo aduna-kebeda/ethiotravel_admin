@@ -21,6 +21,7 @@ import {
   Menu,
   X,
 } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 interface SidebarProps {
   className?: string
@@ -29,9 +30,24 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { logout } = useAuth()
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen)
+  }
+
+  // Fixed: Added async keyword to the function
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+      // No need to navigate - logout function handles this
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   const routes = [
@@ -137,11 +153,14 @@ export function Sidebar({ className }: SidebarProps) {
           </nav>
         </div>
         <div className="border-t p-4">
-          <Button variant="outline" className="w-full justify-start gap-2" asChild>
-            <Link href="/auth/signout">
-              <LogOut className="h-4 w-4" />
-              <span>Log out</span>
-            </Link>
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
+            <LogOut className="h-4 w-4" />
+            <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
           </Button>
         </div>
       </div>

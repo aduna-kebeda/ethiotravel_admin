@@ -1,5 +1,6 @@
 "use client"
 
+
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
@@ -23,7 +24,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>
   register: (userData: RegisterData) => Promise<{ success: boolean; message: string }>
   verifyEmail: (email: string, code: string) => Promise<{ success: boolean; message: string }>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 type RegisterData = {
@@ -231,28 +232,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Update the logout function to clear the HTTP-only cookie
+  // Updated logout function to properly implement the API logout endpoint
   const logout = async () => {
+    setIsLoading(true)
     try {
       const refreshToken = localStorage.getItem("refreshToken")
       const accessToken = localStorage.getItem("accessToken")
 
       if (refreshToken && accessToken) {
-        // Call the logout API endpoint
-        await fetch("https://ai-driven-travel.onrender.com/api/users/logout/", {
+        console.log("Attempting to logout with refresh token")
+
+        // Call the backend logout API endpoint with proper headers and body
+        const logoutResponse = await fetch("https://ai-driven-travel.onrender.com/api/users/logout/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
+            Accept: "application/json",
           },
           body: JSON.stringify({ refresh: refreshToken }),
         })
+
+        if (logoutResponse.ok) {
+          const logoutData = await logoutResponse.json()
+          console.log("Logout successful:", logoutData.message)
+        } else {
+          console.error("Backend logout failed:", await logoutResponse.text())
+        }
+      } else {
+        console.warn("No refresh token or access token found for logout")
       }
 
-      // Clear the HTTP-only cookie
-      await fetch("/api/auth/logout", {
+      // Clear the HTTP-only cookie regardless of API response
+      const cookieLogoutResponse = await fetch("/api/auth/logout", {
         method: "POST",
       })
+
+      if (cookieLogoutResponse.ok) {
+        console.log("Cookie cleared successfully")
+      } else {
+        console.error("Failed to clear auth cookie:", await cookieLogoutResponse.text())
+      }
     } catch (error) {
       console.error("Logout error:", error)
     } finally {
@@ -261,8 +281,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("refreshToken")
       localStorage.removeItem("user")
       localStorage.removeItem("pendingVerification")
+
       setUser(null)
       setIsAuthenticated(false)
+      setIsLoading(false)
+
+      // Navigate to login page
       router.push("/login")
     }
   }
@@ -281,3 +305,5 @@ export function useAuth() {
   }
   return context
 }
+
+export { AuthContext }

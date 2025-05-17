@@ -1,13 +1,12 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -38,7 +37,6 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
     lastLogin: "2023-11-28T14:32:15Z",
     createdAt: "2023-09-15T10:20:30Z",
     updatedAt: "2023-11-28T14:32:15Z",
-    // Activity data
     bookings: [
       {
         id: "booking1",
@@ -273,4 +271,63 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <span className="flex items-center gap-2">
-                        <span className="h-4 w-4 animate\
+                        <svg
+                          className="h-4 w-4 animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Placeholder for activity and settings tabs */}
+        <TabsContent value="activity">
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity</CardTitle>
+              <CardDescription>User's recent activities and bookings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Activity content goes here (e.g., bookings, reviews, recent activity).</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Settings</CardTitle>
+              <CardDescription>Additional user settings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Settings content goes here.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

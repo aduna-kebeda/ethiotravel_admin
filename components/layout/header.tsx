@@ -8,11 +8,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 
 export function Header() {
   const { setTheme, theme } = useTheme()
-  const { user, logout } = useAuth()
+  const { user, logout, isLoading } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { toast } = useToast()
 
   // Avoid hydration mismatch
   useEffect(() => {
@@ -21,6 +24,29 @@ export function Header() {
 
   if (!mounted) {
     return null
+  }
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      toast({
+        title: "Logging out...",
+        description: "Please wait while we sign you out.",
+      })
+
+      await logout()
+
+      // The redirect is handled in the logout function
+    } catch (error) {
+      console.error("Logout error:", error)
+      toast({
+        title: "Logout failed",
+        description: "There was a problem signing you out. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -69,14 +95,9 @@ export function Header() {
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                // Show loading state or disable the button if needed
-                logout()
-              }}
-            >
+            <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut || isLoading}>
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
