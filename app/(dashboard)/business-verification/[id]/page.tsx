@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -12,6 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 import {
   Building2,
   Calendar,
@@ -25,62 +27,124 @@ import {
   User,
   XCircle,
 } from "lucide-react"
+import { businessApi, normalizeBusinessData, type Business } from "@/lib/api-business"
+import { useToast } from "@/hooks/use-toast"
 
-export default function BusinessVerificationDetailPage({ params }: { params: { id: string } }) {
+export default function BusinessVerificationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const [id, setId] = useState<string | null>(null)
   const router = useRouter()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [verificationStatus, setVerificationStatus] = useState("pending")
+  const [error, setError] = useState<string | null>(null)
+  const [business, setBusiness] = useState<Business | null>(null)
+  const [verificationStatus, setVerificationStatus] = useState<"approved" | "rejected">("approved")
   const [rejectionReason, setRejectionReason] = useState("")
 
-  // Mock business data
-  const business = {
-    id: params.id,
-    businessName: "Addis Ababa Grand Hotel",
-    businessType: "Hotel",
-    description:
-      "A luxury hotel located in the heart of Addis Ababa, offering premium accommodations with modern amenities and traditional Ethiopian hospitality.",
-    region: "Addis Ababa",
-    city: "Addis Ababa",
-    address: "Bole Road, Near Millennium Hall",
-    phone: "+251 11 123 4567",
-    email: "info@aagrandhotel.com",
-    website: "www.aagrandhotel.com",
-    status: "pending",
-    openingHours: "24/7",
-    facilities: ["Wi-Fi", "Restaurant", "Swimming Pool", "Conference Room", "Spa"],
-    services: ["Room Service", "Airport Shuttle", "Laundry", "Tour Desk"],
-    ownerName: "Abebe Kebede",
-    ownerEmail: "abebe@aagrandhotel.com",
-    ownerPhone: "+251 91 234 5678",
-    documents: [
-      { name: "Business License", url: "#" },
-      { name: "Tax Registration", url: "#" },
-      { name: "Owner ID", url: "#" },
-    ],
-    createdAt: "2023-11-15",
-  }
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setId(resolvedParams.id)
+    }).catch((err) => {
+      console.error("Failed to resolve params:", err)
+      setError("Failed to load business ID.")
+    })
+  }, [params])
+
+  useEffect(() => {
+    if (!id) return
+
+    const fetchBusinessDetails = async () => {
+      try {
+        setIsLoading(true)
+        const data = await businessApi.getById(id)
+        setBusiness(normalizeBusinessData(data))
+        setError(null)
+      } catch (err) {
+        console.error("Failed to fetch business details:", err)
+        setError("Failed to load business details. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBusinessDetails()
+  }, [id])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!id) return
+
     setIsSubmitting(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      // First verify the business
+      await businessApi.verifyBusiness(id, business || {})
+
+      // Then update the status (approved or rejected)
+      await businessApi.updateStatus(
+        id,
+        verificationStatus,
+        verificationStatus === "rejected" ? rejectionReason : undefined,
+      )
+
+      toast({
+        title: "Success",
+        description: `Business has been ${verificationStatus === "approved" ? "approved" : "rejected"}.`,
+        variant: "default",
+      })
+
       router.push("/business-verification")
-    }, 1500)
+    } catch (err) {
+      console.error("Failed to submit verification decision:", err)
+      toast({
+        title: "Error",
+        description: "Failed to submit verification decision. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (isLoading || id === null) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="mt-2 h-4 w-1/2" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !business) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error || "Business not found"}</AlertDescription>
+        </Alert>
+        <Button variant="outline" asChild>
+          <Link href="/business-verification">Back to List</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{business.businessName}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{business.name}</h1>
           <div className="flex items-center gap-2">
             <Badge
               variant="outline"
               className={
-                business.status === "approved"
+                business.is_verified
                   ? "border-success bg-success/10 text-success"
                   : business.status === "rejected"
                     ? "border-destructive bg-destructive/10 text-destructive"
@@ -88,18 +152,18 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
               }
             >
               <span className="flex items-center gap-1">
-                {business.status === "approved" ? (
+                {business.is_verified ? (
                   <CheckCircle className="h-3 w-3" />
                 ) : business.status === "rejected" ? (
                   <XCircle className="h-3 w-3" />
                 ) : (
                   <Clock className="h-3 w-3" />
                 )}
-                {business.status.charAt(0).toUpperCase() + business.status.slice(1)}
+                {business.is_verified ? "Verified" : business.status === "rejected" ? "Rejected" : "Pending"}
               </span>
             </Badge>
             <span className="text-sm text-muted-foreground">
-              Submitted on {new Date(business.createdAt).toLocaleDateString()}
+              Submitted on {new Date(business.created_at).toLocaleDateString()}
             </span>
           </div>
         </div>
@@ -114,7 +178,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
         <TabsList>
           <TabsTrigger value="details">Business Details</TabsTrigger>
           <TabsTrigger value="owner">Owner Information</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="verification">Verification</TabsTrigger>
         </TabsList>
 
@@ -130,7 +194,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                   <p className="text-sm font-medium text-muted-foreground">Business Type</p>
                   <p className="flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
-                    {business.businessType}
+                    {business.business_type}
                   </p>
                 </div>
 
@@ -138,7 +202,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                   <p className="text-sm font-medium text-muted-foreground">Website</p>
                   <p className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    {business.website}
+                    {business.website || "Not provided"}
                   </p>
                 </div>
 
@@ -146,7 +210,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                   <p className="text-sm font-medium text-muted-foreground">Email</p>
                   <p className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    {business.email}
+                    {business.contact_email}
                   </p>
                 </div>
 
@@ -154,7 +218,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                   <p className="text-sm font-medium text-muted-foreground">Phone</p>
                   <p className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    {business.phone}
+                    {business.contact_phone}
                   </p>
                 </div>
 
@@ -186,7 +250,11 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                   <p className="text-sm font-medium text-muted-foreground">Opening Hours</p>
                   <p className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    {business.openingHours}
+                    {typeof business.opening_hours === "string"
+                      ? business.opening_hours
+                      : Array.isArray(business.opening_hours)
+                        ? business.opening_hours.join(", ")
+                        : "Not provided"}
                   </p>
                 </div>
               </div>
@@ -199,24 +267,68 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Facilities</p>
                 <div className="flex flex-wrap gap-2">
-                  {business.facilities.map((facility, index) => (
-                    <Badge key={index} variant="secondary">
-                      {facility}
-                    </Badge>
-                  ))}
+                  {Array.isArray(business.facilities) && business.facilities.length > 0 ? (
+                    business.facilities.map((facility, index) => (
+                      <Badge key={index} variant="secondary">
+                        {facility}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No facilities listed</span>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Services</p>
                 <div className="flex flex-wrap gap-2">
-                  {business.services.map((service, index) => (
-                    <Badge key={index} variant="secondary">
-                      {service}
-                    </Badge>
-                  ))}
+                  {Array.isArray(business.services) && business.services.length > 0 ? (
+                    business.services.map((service, index) => (
+                      <Badge key={index} variant="secondary">
+                        {service}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No services listed</span>
+                  )}
                 </div>
               </div>
+
+              {business.main_image && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Main Image</p>
+                  <div className="overflow-hidden rounded-md">
+                    <img
+                      src={business.main_image || "/placeholder.svg"}
+                      alt={business.name}
+                      className="h-48 w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder.svg?height=192&width=384"
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(business.gallery_images) && business.gallery_images.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Gallery Images</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                    {business.gallery_images.map((image, index) => (
+                      <div key={index} className="overflow-hidden rounded-md">
+                        <img
+                          src={image || "/placeholder.svg"}
+                          alt={`${business.name} gallery ${index + 1}`}
+                          className="h-24 w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?height=96&width=96"
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -228,54 +340,84 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
               <CardDescription>Details about the business owner.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Owner Name</p>
-                  <p className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    {business.ownerName}
-                  </p>
-                </div>
+              {business.owner ? (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Owner Name</p>
+                    <p className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      {business.owner.first_name} {business.owner.last_name}
+                    </p>
+                  </div>
 
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Owner Email</p>
-                  <p className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    {business.ownerEmail}
-                  </p>
-                </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Owner Email</p>
+                    <p className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      {business.owner.email}
+                    </p>
+                  </div>
 
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Owner Phone</p>
-                  <p className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    {business.ownerPhone}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Username</p>
+                    <p className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      {business.owner.username}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-muted-foreground">Owner information not available.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="documents" className="space-y-4">
+        <TabsContent value="reviews" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Submitted Documents</CardTitle>
-              <CardDescription>Review the documents provided by the business.</CardDescription>
+              <CardTitle>Business Reviews</CardTitle>
+              <CardDescription>
+                Reviews submitted by users for this business. Total: {business.total_reviews || 0}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                {business.documents.map((doc, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-md border p-4">
-                    <div className="font-medium">{doc.name}</div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={doc.url} target="_blank">
-                        View Document
-                      </Link>
-                    </Button>
+              {business.reviews && business.reviews.length > 0 ? (
+                business.reviews.map((review) => (
+                  <div key={review.id} className="rounded-lg border p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < review.rating ? "fill-accent text-accent" : "fill-muted text-muted"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="font-medium">
+                          {review.user.first_name} {review.user.last_name}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm">{review.comment}</p>
+                    {review.is_reported && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="border-destructive bg-destructive/10 text-destructive">
+                          Reported
+                        </Badge>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground">No reviews available for this business.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -290,7 +432,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
               <CardContent className="space-y-6">
                 <RadioGroup
                   value={verificationStatus}
-                  onValueChange={setVerificationStatus}
+                  onValueChange={(value) => setVerificationStatus(value as "approved" | "rejected")}
                   className="space-y-4"
                   required
                 >
@@ -328,7 +470,7 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
                 <Button variant="outline" asChild>
                   <Link href="/business-verification">Cancel</Link>
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || !id}>
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -347,5 +489,25 @@ export default function BusinessVerificationDetailPage({ params }: { params: { i
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+// Star component for reviews
+function Star(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
   )
 }

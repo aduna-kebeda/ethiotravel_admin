@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,44 +10,144 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 import { Calendar, CheckCircle, Flag, Package, Star, ThumbsUp, User, XCircle, Building2, Globe } from "lucide-react"
+import { businessApi, type Business, type BusinessReview } from "@/lib/api-business"
+import { useToast } from "@/hooks/use-toast"
 
-export default function ReviewDetailPage({ params }: { params: { id: string } }) {
+export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params // Resolve the Promise
+  const id = resolvedParams.id
   const router = useRouter()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [reviewStatus, setReviewStatus] = useState("pending")
+  const [error, setError] = useState<string | null>(null)
+  const [review, setReview] = useState<(BusinessReview & { businessName: string; entityType: string }) | null>(null)
+  const [business, setBusiness] = useState<Business | null>(null)
+  const [reviewStatus, setReviewStatus] = useState<"approved" | "rejected">("approved")
   const [rejectionReason, setRejectionReason] = useState("")
 
-  // Mock review data
-  const review = {
-    id: params.id,
-    userId: "user123",
-    userName: "John Smith",
-    userEmail: "john.smith@example.com",
-    entityType: "package",
-    entityId: "pkg123",
-    entityName: "Historic Northern Ethiopia Tour",
-    rating: 5,
-    title: "Amazing experience!",
-    content:
-      "This was the trip of a lifetime. The guides were knowledgeable and the accommodations were excellent. We visited Lalibela, Axum, and Gondar, and each place was more impressive than the last. The rock-hewn churches of Lalibela were particularly stunning. Our guide, Abebe, was fantastic and shared so much about Ethiopian history and culture. The food was delicious and we felt safe and well-cared for throughout the journey. I would highly recommend this tour to anyone interested in history, culture, and beautiful landscapes.",
-    images: ["image1.jpg", "image2.jpg"],
-    status: "pending",
-    helpfulCount: 12,
-    reported: true,
-    reportReason: "Potentially fake review",
-    createdAt: "2023-11-15",
-  }
+  useEffect(() => {
+    const fetchReviewDetails = async () => {
+      try {
+        setIsLoading(true)
+
+        // First get all businesses
+        const businessResponse = await businessApi.getAll()
+        const businessList = businessResponse.results
+
+        // Find the review in all businesses
+        let foundReview: (BusinessReview & { businessName: string; entityType: string }) | null = null
+        let foundBusiness: Business | null = null
+
+        for (const business of businessList) {
+          // If reviews are already included in the business object
+          if (business.reviews && business.reviews.length > 0) {
+            const matchingReview = business.reviews.find((r: BusinessReview) => r.id.toString() === id)
+            if (matchingReview) {
+              foundReview = {
+                ...matchingReview,
+                businessName: business.name,
+                entityType: "business",
+              }
+              foundBusiness = business
+              break
+            }
+          } else if (business.total_reviews > 0) {
+            // If we need to fetch reviews separately
+            try {
+              const reviewsResponse = await businessApi.getReviews(business.id)
+              const matchingReview = reviewsResponse.results.find((r: BusinessReview) => r.id.toString() === id)
+              if (matchingReview) {
+                foundReview = {
+                  ...matchingReview,
+                  businessName: business.name,
+                  entityType: "business",
+                }
+                foundBusiness = business
+                break
+              }
+            } catch (err) {
+              console.error(`Failed to fetch reviews for business ${business.id}:`, err)
+            }
+          }
+        }
+
+        if (foundReview && foundBusiness) {
+          setReview(foundReview)
+          setBusiness(foundBusiness)
+          setError(null)
+        } else {
+          setError("Review not found")
+        }
+      } catch (err) {
+        console.error("Failed to fetch review details:", err)
+        setError("Failed to load review details. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchReviewDetails()
+  }, [id])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      // In a real implementation, you would call an API to update the review status
+      // For now, we'll just simulate a successful update
+
+      toast({
+        title: "Success",
+        description: `Review has been ${reviewStatus === "approved" ? "approved" : "rejected"}.`,
+        variant: "default",
+      })
+
       router.push("/reviews")
-    }, 1500)
+    } catch (err) {
+      console.error("Failed to submit review decision:", err)
+      toast({
+        title: "Error",
+        description: "Failed to submit review decision. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-10 w-3/4" />
+          <Skeleton className="mt-2 h-4 w-1/2" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !review || !business) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error || "Review not found"}</AlertDescription>
+        </Alert>
+        <Button variant="outline" asChild>
+          <Link href="/reviews">Back to List</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -57,29 +156,14 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Review Details</h1>
           <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={
-                review.status === "approved"
-                  ? "border-success bg-success/10 text-success"
-                  : review.status === "rejected"
-                    ? "border-destructive bg-destructive/10 text-destructive"
-                    : "border-warning bg-warning/10 text-warning-foreground"
-              }
-            >
+            <Badge variant="outline" className="border-warning bg-warning/10 text-warning-foreground">
               <span className="flex items-center gap-1">
-                {review.status === "approved" ? (
-                  <CheckCircle className="h-3 w-3" />
-                ) : review.status === "rejected" ? (
-                  <XCircle className="h-3 w-3" />
-                ) : (
-                  <span className="h-3 w-3 rounded-full bg-warning" />
-                )}
-                {review.status.charAt(0).toUpperCase() + review.status.slice(1)}
+                <span className="h-3 w-3 rounded-full bg-warning" />
+                Pending
               </span>
             </Badge>
             <span className="text-sm text-muted-foreground">
-              Submitted on {new Date(review.createdAt).toLocaleDateString()}
+              Submitted on {new Date(review.created_at).toLocaleDateString()}
             </span>
           </div>
         </div>
@@ -98,7 +182,6 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-1">
-              <h3 className="text-xl font-bold">{review.title}</h3>
               <div className="flex items-center gap-2">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -113,26 +196,15 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
             </div>
 
             <div className="space-y-1">
-              <p className="whitespace-pre-line text-sm">{review.content}</p>
+              <p className="whitespace-pre-line text-sm">{review.comment}</p>
             </div>
-
-            {review.images.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Attached Images</p>
-                <div className="flex flex-wrap gap-2">
-                  {review.images.map((image, index) => (
-                    <div key={index} className="h-20 w-20 rounded-md bg-muted"></div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <ThumbsUp className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{review.helpfulCount} users found this helpful</span>
+                <span className="text-sm">{review.helpful_votes} users found this helpful</span>
               </div>
-              {review.reported && (
+              {review.is_reported && (
                 <Badge variant="outline" className="border-destructive bg-destructive/10 text-destructive">
                   <Flag className="mr-1 h-3 w-3" />
                   Reported
@@ -140,10 +212,10 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
               )}
             </div>
 
-            {review.reported && (
+            {review.is_reported && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 <p className="font-medium">Report Reason:</p>
-                <p>{review.reportReason}</p>
+                <p>This review has been reported by users</p>
               </div>
             )}
           </CardContent>
@@ -160,20 +232,25 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
                 <p className="text-sm font-medium text-muted-foreground">Name</p>
                 <p className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  {review.userName}
+                  {review.user.first_name} {review.user.last_name}
                 </p>
               </div>
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">Email</p>
-                <p>{review.userEmail}</p>
+                <p>{review.user.email}</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Username</p>
+                <p>{review.user.username}</p>
               </div>
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">Submitted On</p>
                 <p className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  {new Date(review.createdAt).toLocaleDateString()}
+                  {new Date(review.created_at).toLocaleDateString()}
                 </p>
               </div>
             </CardContent>
@@ -201,26 +278,16 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">Name</p>
-                <p>{review.entityName}</p>
+                <p>{review.businessName}</p>
               </div>
 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">ID</p>
-                <p className="text-sm text-muted-foreground">{review.entityId}</p>
+                <p className="text-sm text-muted-foreground">{business.id}</p>
               </div>
 
               <Button variant="outline" size="sm" className="w-full" asChild>
-                <Link
-                  href={
-                    review.entityType === "package"
-                      ? `/packages/${review.entityId}`
-                      : review.entityType === "business"
-                        ? `/business-verification/${review.entityId}`
-                        : `/destinations/${review.entityId}`
-                  }
-                >
-                  View {review.entityType.charAt(0).toUpperCase() + review.entityType.slice(1)}
-                </Link>
+                <Link href={`/business-verification/${business.id}`}>View Business</Link>
               </Button>
             </CardContent>
           </Card>
@@ -234,7 +301,12 @@ export default function ReviewDetailPage({ params }: { params: { id: string } })
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
-            <RadioGroup value={reviewStatus} onValueChange={setReviewStatus} className="space-y-4" required>
+            <RadioGroup
+              value={reviewStatus}
+              onValueChange={(value) => setReviewStatus(value as "approved" | "rejected")}
+              className="space-y-4"
+              required
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="approved" id="approved" />
                 <Label htmlFor="approved" className="flex items-center gap-2 font-normal">
