@@ -32,12 +32,13 @@ export async function apiRequest<T>(
   }
 
   try {
-    console.log(`Making ${method} request to ${API_BASE_URL}${endpoint}`)
+    const url = `${API_BASE_URL}${endpoint}`
+    console.log(`Making ${method} request to ${url}`)
     if (data) {
       console.log("Request data:", JSON.stringify(data, null, 2))
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+    const response = await fetch(url, config)
 
     // Handle 204 No Content response
     if (response.status === 204) {
@@ -60,15 +61,18 @@ export async function apiRequest<T>(
         try {
           // Try to get text response if JSON parsing fails
           errorText = await responseClone.text()
-          console.error("Error response text:", errorText)
-          errorData = { detail: errorText || "Unknown error" }
+          // Truncate long error messages
+          const truncatedText = errorText.length > 500 ? errorText.substring(0, 500) + "..." : errorText
+          console.error("Error response text:", truncatedText)
+          errorData = { detail: "API request failed. Please try again later." }
         } catch (textError) {
           console.error("Failed to get error response text:", textError)
           errorData = { detail: "Unknown error" }
         }
       }
 
-      console.error(`API error (${response.status}):`, errorData)
+      // Log the error but don't show the full error object which might be large
+      console.error(`API error (${response.status}) for ${url}`)
 
       // Extract error message from different possible formats
       let errorMessage = `API error (${response.status})`
@@ -80,7 +84,7 @@ export async function apiRequest<T>(
         else if (err.error) errorMessage = err.error
         else if (err.errors) errorMessage = JSON.stringify(err.errors)
       } else if (errorText) {
-        errorMessage = errorText
+        errorMessage = "API request failed. Please try again later."
       }
 
       throw new Error(errorMessage)
@@ -126,7 +130,7 @@ export const packageApi = {
     return apiRequest<{
       count: number
       results: Package[]
-    }>("/packages/packages/")
+    }>("/packages/")
   },
 
   // Get a single package by ID
@@ -135,22 +139,22 @@ export const packageApi = {
     if (!id || isNaN(Number(id))) {
       throw new Error("Invalid package ID")
     }
-    return apiRequest<Package>(`/packages/packages/${id}/`)
+    return apiRequest<Package>(`/packages/${id}/`)
   },
 
   // Create a new package
   create: async (packageData: Partial<Package>) => {
-    return apiRequest<Package>("/packages/packages/", "POST", packageData)
+    return apiRequest<Package>("/packages/", "POST", packageData)
   },
 
   // Update a package
   update: async (id: number | string, packageData: Partial<Package>) => {
-    return apiRequest<Package>(`/packages/packages/${id}/`, "PUT", packageData)
+    return apiRequest<Package>(`/packages/${id}/`, "PUT", packageData)
   },
 
   // Delete a package
   delete: async (id: number | string) => {
-    return apiRequest<void>(`/packages/packages/${id}/`, "DELETE")
+    return apiRequest<void>(`/packages/${id}/`, "DELETE")
   },
 }
 
@@ -194,6 +198,7 @@ export interface Package {
   coordinates: number[]
   reviews?: any[]
   departures?: any[]
+  created_at?: string
 }
 
 // Format package data for API submission
