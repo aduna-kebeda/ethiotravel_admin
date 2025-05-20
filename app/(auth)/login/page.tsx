@@ -51,7 +51,7 @@ export default function LoginPage() {
         console.log("Redirecting to dashboard...")
         router.push("/dashboard")
       } else {
-        console.error("Login failed:", message)
+        console.log("Login failed:", message)
         toast({
           title: "Login failed",
           description: message,

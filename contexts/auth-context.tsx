@@ -13,8 +13,14 @@ type User = {
   first_name: string
   last_name: string
   role?: string
+
   status?: string
   email_verified?: boolean
+
+
+  is_active: boolean
+  is_staff: boolean
+  is_superuser: boolean
 }
 
 type AuthContextType = {
@@ -35,6 +41,7 @@ type RegisterData = {
   first_name: string
   last_name: string
   role: string
+
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -61,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Auth check response:", authCheckData)
 
         if (authCheckData.isAuthenticated) {
+          console.log("User is authenticated via cookie")
           // If we have a valid cookie but no user data, try to get user data
           const userData = localStorage.getItem("user")
           if (userData) {
@@ -70,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // If we have a cookie but no user data, we need to fetch the user data
             // This would require an API endpoint to get the current user
             console.log("Cookie exists but no user data found")
+            logout()
+            
             // You would typically call an API endpoint here to get the user data
           }
         } else {
@@ -127,6 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: data.message || "Login failed" }
       }
 
+      if (data.data.user.role != "admin") {
+        console.log("Login failed:", data)
+        setIsLoading(false)
+        return { success: false, message: "Login Failed User Is not an admin" }
+      }
+
       // Store tokens and user data
       localStorage.setItem("accessToken", data.data.access_token)
       localStorage.setItem("refreshToken", data.data.refresh_token)
@@ -149,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Set authentication state
       setUser(data.data.user)
+      console.log("User data set:", data.data.user)
       setIsAuthenticated(true)
 
       // Add a delay to ensure state is updated before the middleware checks

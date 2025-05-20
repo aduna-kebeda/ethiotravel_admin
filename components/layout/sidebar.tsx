@@ -31,7 +31,7 @@ export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen)
@@ -87,12 +87,20 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/blog",
       active: pathname.startsWith("/blog"),
     },
-    {
-      label: "Users",
-      icon: Users,
-      href: "/users",
-      active: pathname.startsWith("/users"),
-    },
+
+    ...(user?.is_superuser
+      ? [
+        {
+          label: "Users",
+          icon: Users,
+          href: "/users",
+          active: pathname.startsWith("/users"),
+        },
+      ]
+      : []),
+
+
+
     {
       label: "Reviews",
       icon: Star,
