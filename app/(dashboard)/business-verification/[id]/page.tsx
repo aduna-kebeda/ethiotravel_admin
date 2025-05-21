@@ -77,21 +77,27 @@ export default function BusinessVerificationDetailPage({ params }: { params: Pro
     setIsSubmitting(true)
 
     try {
-      // First verify the business
-      await businessApi.verifyBusiness(id, business || {})
+      if (verificationStatus === "rejected") {
+        // Delete the business if rejected
+        await businessApi.deleteBusiness(id)
+        toast({
+          title: "Success",
+          description: "Business has been rejected and deleted.",
+          variant: "default",
+        })
+      } else {
+        // First verify the business
+        await businessApi.verifyBusiness(id, business || {})
 
-      // Then update the status (approved or rejected)
-      await businessApi.updateStatus(
-        id,
-        verificationStatus,
-        verificationStatus === "rejected" ? rejectionReason : undefined,
-      )
+        // Then update the status to approved
+        await businessApi.updateStatus(id, "approved")
 
-      toast({
-        title: "Success",
-        description: `Business has been ${verificationStatus === "approved" ? "approved" : "rejected"}.`,
-        variant: "default",
-      })
+        toast({
+          title: "Success",
+          description: "Business has been approved.",
+          variant: "default",
+        })
+      }
 
       router.push("/business-verification")
     } catch (err) {

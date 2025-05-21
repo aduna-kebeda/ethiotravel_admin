@@ -107,18 +107,18 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/reviews",
       active: pathname.startsWith("/reviews"),
     },
-    {
-      label: "Analytics",
-      icon: BarChart3,
-      href: "/analytics",
-      active: pathname.startsWith("/analytics"),
-    },
-    {
-      label: "Settings",
-      icon: Settings,
-      href: "/settings",
-      active: pathname.startsWith("/settings"),
-    },
+    // {
+    //   label: "Analytics",
+    //   icon: BarChart3,
+    //   href: "/analytics",
+    //   active: pathname.startsWith("/analytics"),
+    // },
+    // {
+    //   label: "Settings",
+    //   icon: Settings,
+    //   href: "/settings",
+    //   active: pathname.startsWith("/settings"),
+    // },
   ]
 
   return (
