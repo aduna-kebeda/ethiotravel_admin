@@ -113,12 +113,12 @@ export function Sidebar({ className }: SidebarProps) {
     //   href: "/analytics",
     //   active: pathname.startsWith("/analytics"),
     // },
-    // {
-    //   label: "Settings",
-    //   icon: Settings,
-    //   href: "/settings",
-    //   active: pathname.startsWith("/settings"),
-    // },
+    {
+      label: "Settings",
+      icon: Settings,
+      href: "/settings",
+      active: pathname.startsWith("/settings"),
+    },
   ]
 
   return (

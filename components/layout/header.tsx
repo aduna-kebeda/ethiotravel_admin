@@ -54,12 +54,12 @@ export function Header() {
       <div className="flex-1 md:flex-initial"></div>
 
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
+        {/* <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <Badge className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
             3
           </Badge>
-        </Button>
+        </Button> */}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

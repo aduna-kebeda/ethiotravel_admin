@@ -86,17 +86,17 @@ export default function BusinessVerificationDetailPage({ params }: { params: Pro
           variant: "default",
         })
       } else {
-        // First verify the business
-        await businessApi.verifyBusiness(id, business || {})
+      // First verify the business
+      await businessApi.verifyBusiness(id, business || {})
 
         // Then update the status to approved
         await businessApi.updateStatus(id, "approved")
 
-        toast({
-          title: "Success",
+      toast({
+        title: "Success",
           description: "Business has been approved.",
-          variant: "default",
-        })
+        variant: "default",
+      })
       }
 
       router.push("/business-verification")
