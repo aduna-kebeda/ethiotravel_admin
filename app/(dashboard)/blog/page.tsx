@@ -175,8 +175,8 @@ export default function BlogPage() {
             <TableRow>
               <TableHead>Title</TableHead>
               <TableHead className="hidden md:table-cell">Author</TableHead>
-              <TableHead className="hidden md:table-cell">Tags</TableHead>
-              <TableHead className="hidden md:table-cell">Stats</TableHead>
+              {/* <TableHead className="hidden md:table-cell">Tags</TableHead> */}
+              {/* <TableHead className="hidden md:table-cell">Stats</TableHead> */}
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Featured</TableHead>
               <TableHead className="hidden md:table-cell">Created</TableHead>
@@ -236,7 +236,7 @@ export default function BlogPage() {
                       <span>{post.authorName}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  {/* <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {post.tags &&
                         post.tags.slice(0, 2).map((tag, index) => (
@@ -250,8 +250,8 @@ export default function BlogPage() {
                         </Badge>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  </TableCell> */}
+                  {/* <TableCell className="hidden md:table-cell">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <Eye className="h-3 w-3 text-muted-foreground" />
@@ -262,7 +262,7 @@ export default function BlogPage() {
                         <span className="text-sm">{post.readTime} min</span>
                       </div>
                     </div>
-                  </TableCell>
+                  </TableCell> */}
                   <TableCell>
                     <Select
                       defaultValue={post.status}
