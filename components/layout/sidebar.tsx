@@ -101,12 +101,12 @@ export function Sidebar({ className }: SidebarProps) {
 
 
 
-    {
-      label: "Reviews",
-      icon: Star,
-      href: "/reviews",
-      active: pathname.startsWith("/reviews"),
-    },
+    // {
+    //   label: "Reviews",
+    //   icon: Star,
+    //   href: "/reviews",
+    //   active: pathname.startsWith("/reviews"),
+    // },
     // {
     //   label: "Analytics",
     //   icon: BarChart3,
