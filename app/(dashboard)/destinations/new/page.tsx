@@ -450,25 +450,15 @@ export default function NewDestinationPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="region">
-                    Region <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
+                  <Label htmlFor="region">Region</Label>
+                  <Input
+                    id="region"
+                    name="region"
                     value={formData.region}
-                    onValueChange={(value) => handleSelectChange("region", value)}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Amhara"
                     required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ethiopianRegions.map((region) => (
-                        <SelectItem key={region.value} value={region.value}>
-                          {region.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
 
                 <div className="space-y-2">

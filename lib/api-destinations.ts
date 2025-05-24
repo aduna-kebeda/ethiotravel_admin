@@ -143,9 +143,9 @@ export function formatDestinationData(data: any): Partial<Destination> {
     galleryImages = [galleryImages].filter(Boolean)
   }
 
-  // Format coordinates properly
-  const latitude = data.latitude || ""
-  const longitude = data.longitude || ""
+  // Format coordinates properly - only include if both are provided
+  const latitude = data.latitude?.trim() || null
+  const longitude = data.longitude?.trim() || null
 
   // Ensure category is a string (API might expect a string, not an array)
   const category = Array.isArray(data.category) ? data.category[0] : data.category || "historical"
@@ -154,7 +154,7 @@ export function formatDestinationData(data: any): Partial<Destination> {
     title: data.title || "",
     description: data.description || "",
     category,
-    region: data.region || "addis_ababa",
+    region: data.region?.trim() || "",
     city: data.city || "",
     address: data.address || "",
     latitude,
