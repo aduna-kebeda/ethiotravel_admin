@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -10,32 +9,61 @@ import { useToast } from "@/components/ui/use-toast"
 
 interface ImageUploadProps {
   onImageUploaded: (url: string) => void
+  onUploadProgress?: (progress: number) => void
   existingImageUrl?: string
   className?: string
+  maxFiles?: number
+  acceptedFileTypes?: string[]
+  maxFileSize?: number
 }
 
-export default function ImageUpload({ onImageUploaded, existingImageUrl, className }: ImageUploadProps) {
+export default function ImageUpload({
+  onImageUploaded,
+  onUploadProgress,
+  existingImageUrl,
+  className,
+  maxFiles = 5,
+  acceptedFileTypes = ["image/jpeg", "image/png", "image/webp"],
+  maxFileSize = 5 * 1024 * 1024, // 5MB
+}: ImageUploadProps) {
+  const [image, setImage] = useState<string>(existingImageUrl || "")
   const [isUploading, setIsUploading] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(existingImageUrl || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
-  const [preview, setPreview] = useState<string | null>(existingImageUrl || null)
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Show preview
-    const reader = new FileReader()
-    reader.onload = () => {
-      setPreview(reader.result as string)
+    // Validate file size before upload
+    if (file.size > maxFileSize) {
+      toast({
+        title: "File too large",
+        description: `Please upload an image smaller than ${maxFileSize / (1024 * 1024)}MB`,
+        variant: "destructive",
+      })
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+      return
     }
-    reader.readAsDataURL(file)
 
-    // Upload to server
+    // Validate file type
+    if (!acceptedFileTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: `Please upload a valid image file (${acceptedFileTypes.join(", ")})`,
+        variant: "destructive",
+      })
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+      return
+    }
+
+    setIsUploading(true)
+
     try {
-      setIsUploading(true)
-
       const formData = new FormData()
       formData.append("image", file)
       formData.append("folder", "events")
@@ -45,41 +73,38 @@ export default function ImageUpload({ onImageUploaded, existingImageUrl, classNa
         body: formData,
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Upload response error:", errorText)
-        throw new Error(`Upload failed: ${response.status} ${errorText}`)
+        throw new Error(data.error || "Failed to upload image")
       }
 
-      const data = await response.json()
+      setImage(data.url)
       onImageUploaded(data.url)
 
       toast({
         title: "Image uploaded successfully",
+        variant: "default",
       })
     } catch (error) {
-      console.error("Upload failed:", error)
+      console.error("Image upload failed:", error)
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your image. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload image",
         variant: "destructive",
       })
+      setImage("")
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } finally {
       setIsUploading(false)
     }
   }
 
-  const handleRemoveImage = () => {
-    setPreviewUrl(null)
-    setPreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+  const handleRemove = () => {
+    setImage("")
     onImageUploaded("")
-  }
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click()
   }
 
   return (
@@ -89,44 +114,37 @@ export default function ImageUpload({ onImageUploaded, existingImageUrl, classNa
         ref={fileInputRef}
         id="event-image"
         type="file"
-        accept="image/*"
-        onChange={handleFileChange}
+        accept={acceptedFileTypes.join(",")}
+        onChange={handleUpload}
         className="hidden"
+        disabled={isUploading}
       />
 
-      {preview ? (
-        <div className="relative mt-2 overflow-hidden rounded-md border border-border">
-          <img src={preview || "/placeholder.svg"} alt="Event preview" className="h-64 w-full object-cover" />
+      {image ? (
+        <div className="relative mt-2 h-40 w-full overflow-hidden rounded-md border">
+          <img src={image || "/placeholder.svg"} alt="Event preview" className="h-full w-full object-cover" />
           <Button
-            type="button"
             variant="destructive"
             size="icon"
-            className="absolute right-2 top-2"
-            onClick={handleRemoveImage}
-            disabled={isUploading}
+            className="absolute right-2 top-2 h-6 w-6 rounded-full"
+            onClick={handleRemove}
+            type="button"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
       ) : (
         <div
-          onClick={triggerFileInput}
-          className="mt-2 flex h-64 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/20 transition-colors hover:bg-muted/50"
+          className="mt-2 flex h-40 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed"
+          onClick={() => fileInputRef.current?.click()}
         >
-          {isUploading ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              <span className="text-sm text-muted-foreground">Uploading...</span>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-center">
-              <div className="rounded-full bg-background p-2 text-primary">
-                <Upload className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Click to upload an image</p>
-                <p className="text-xs text-muted-foreground">SVG, PNG, JPG or GIF (max. 5MB)</p>
-              </div>
+          <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">Click to upload an image</p>
+          <p className="text-xs text-muted-foreground">JPEG, PNG, GIF, SVG, WebP (max 5MB)</p>
+          {isUploading && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span className="text-xs">Uploading...</span>
             </div>
           )}
         </div>
@@ -134,3 +152,5 @@ export default function ImageUpload({ onImageUploaded, existingImageUrl, classNa
     </div>
   )
 }
+
+

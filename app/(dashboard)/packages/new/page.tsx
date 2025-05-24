@@ -113,8 +113,66 @@ export default function NewPackagePage() {
       // Validate required fields
       if (!formData.title) throw new Error("Package title is required")
       if (!formData.description) throw new Error("Package description is required")
-      if (!formData.price) throw new Error("Package price is required")
+      if (!formData.short_description) throw new Error("Short description is required")
+      if (!formData.location) throw new Error("Location is required")
+      if (!formData.region) throw new Error("Region is required")
+      if (!formData.price) throw new Error("Price is required")
+      if (!formData.duration) throw new Error("Duration is required")
+      if (!formData.duration_in_days) throw new Error("Duration in days is required")
       if (!formData.image) throw new Error("Main package image is required")
+      if (!formData.departure) throw new Error("Departure location is required")
+      if (!formData.departure_time) throw new Error("Departure time is required")
+      if (!formData.return_time) throw new Error("Return time is required")
+      if (!formData.max_group_size) throw new Error("Maximum group size is required")
+      if (!formData.min_age) throw new Error("Minimum age is required")
+      if (!formData.tour_guide) throw new Error("Tour guide is required")
+      if (!formData.languages) throw new Error("Languages are required")
+
+      // Validate field lengths
+      if (formData.title.length > 200) throw new Error("Title must be less than 200 characters")
+      if (formData.short_description.length > 300) throw new Error("Short description must be less than 300 characters")
+      if (formData.location.length > 100) throw new Error("Location must be less than 100 characters")
+      if (formData.region.length > 100) throw new Error("Region must be less than 100 characters")
+      if (formData.duration.length > 50) throw new Error("Duration must be less than 50 characters")
+      if (formData.departure.length > 100) throw new Error("Departure location must be less than 100 characters")
+      if (formData.tour_guide.length > 100) throw new Error("Tour guide name must be less than 100 characters")
+
+      // Validate numeric fields
+      if (isNaN(Number(formData.price)) || Number(formData.price) < 0) {
+        throw new Error("Price must be a positive number")
+      }
+      if (formData.discounted_price && (isNaN(Number(formData.discounted_price)) || Number(formData.discounted_price) < 0)) {
+        throw new Error("Discounted price must be a positive number")
+      }
+      if (isNaN(Number(formData.duration_in_days)) || Number(formData.duration_in_days) < 1) {
+        throw new Error("Duration in days must be a positive number")
+      }
+      if (isNaN(Number(formData.max_group_size)) || Number(formData.max_group_size) < 1) {
+        throw new Error("Maximum group size must be a positive number")
+      }
+      if (isNaN(Number(formData.min_age)) || Number(formData.min_age) < 0) {
+        throw new Error("Minimum age must be a non-negative number")
+      }
+
+      // Validate difficulty level
+      const validDifficulties = ["Easy", "Moderate", "Challenging"]
+      if (!validDifficulties.includes(formData.difficulty)) {
+        throw new Error("Invalid difficulty level")
+      }
+
+      // Validate status
+      const validStatuses = ["draft", "active"]
+      if (!validStatuses.includes(formData.status)) {
+        throw new Error("Invalid status")
+      }
+
+      // Validate coordinates format
+      if (formData.coordinates) {
+        const coordPattern = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/
+        if (!coordPattern.test(formData.coordinates)) {
+          throw new Error("Invalid coordinates format. Use latitude,longitude (e.g. 12.0333,39.0333)")
+        }
+      }
 
       // Format data for API
       const packageData = formatPackageData(formData)
@@ -126,7 +184,7 @@ export default function NewPackagePage() {
 
       toast({
         title: "Package created successfully",
-        variant: "success",
+        variant: "default",
       })
 
       router.push("/packages")

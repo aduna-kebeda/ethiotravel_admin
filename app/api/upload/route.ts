@@ -8,6 +8,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET || "",
 })
 
+interface CloudinaryUploadResult {
+  secure_url: string
+  public_id: string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -43,17 +48,32 @@ export async function POST(request: NextRequest) {
     const publicId = `${folder}/${timestamp}_${randomString}`
 
     // Upload to Cloudinary with retry logic
-    let uploadResult
+    let uploadResult: CloudinaryUploadResult | undefined
     let retries = 3
 
     while (retries > 0) {
       try {
-        uploadResult = await cloudinary.uploader.upload(base64Image, {
+        uploadResult = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
+          const upload = cloudinary.uploader.upload_stream(
+            {
           folder,
           public_id: publicId,
           resource_type: "image",
           overwrite: true,
+            },
+            (error, result) => {
+              if (error) reject(error)
+              else if (result) resolve(result as CloudinaryUploadResult)
+              else reject(new Error("No result from Cloudinary"))
+            }
+          )
+
+          // Write the base64 data to the upload stream
+          const base64Data = base64Image.split(",")[1]
+          const buffer = Buffer.from(base64Data, "base64")
+          upload.end(buffer)
         })
+
         break
       } catch (error) {
         console.error("Cloudinary upload error:", error)

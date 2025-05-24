@@ -45,32 +45,6 @@ export async function apiRequest<T>(
       return {} as T;
     }
 
-    if (!response.ok) {
-      let errorData = {};
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        console.error("Failed to parse error response:", e);
-        const textResponse = await response.text().catch(() => "");
-        errorData = { detail: textResponse || "Unknown error" };
-      }
-
-      console.error(`API error (${response.status}):`, errorData);
-
-      let errorMessage = "API error";
-      if (typeof errorData === "object" && errorData !== null) {
-        const err = errorData as { detail?: string; message?: string; error?: string };
-        if (err.detail) errorMessage = err.detail;
-        else if (err.message) errorMessage = err.message;
-        else if (err.error) errorMessage = err.error;
-        else errorMessage = `API error: ${response.status}`;
-      } else {
-        errorMessage = String(errorData) || `API error: ${response.status}`;
-      }
-
-      throw new Error(errorMessage);
-    }
-
     const responseData = (await response.json()) as T;
 
     if (method === "PUT" || method === "PATCH") {
