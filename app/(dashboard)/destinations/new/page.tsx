@@ -16,6 +16,22 @@ import { useToast } from "@/hooks/use-toast"
 import { X, Upload } from "lucide-react"
 import { destinationsApi, ethiopianRegions, destinationCategories, statusOptions, formatDestinationData } from "@/lib/api-destinations"
 
+const REGION_CHOICES = [
+  { value: 'addis_ababa', label: 'Addis Ababa' },
+  { value: 'afar', label: 'Afar' },
+  { value: 'amhara', label: 'Amhara' },
+  { value: 'benishangul_gumuz', label: 'Benishangul-Gumuz' },
+  { value: 'diredawa', label: 'Dire Dawa' },
+  { value: 'gambela', label: 'Gambela' },
+  { value: 'harari', label: 'Harari' },
+  { value: 'oromia', label: 'Oromia' },
+  { value: 'sidama', label: 'Sidama' },
+  { value: 'somali', label: 'Somali' },
+  { value: 'south_west', label: 'South West' },
+  { value: 'southern', label: 'Southern' },
+  { value: 'tigray', label: 'Tigray' },
+]
+
 // Single Image Upload Component
 const ImageUpload: React.FC<{
   onUploadComplete: (url: string) => void
@@ -451,14 +467,22 @@ export default function NewDestinationPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="region">Region</Label>
-                  <Input
-                    id="region"
-                    name="region"
+                  <Select
                     value={formData.region}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Amhara"
+                    onValueChange={(value) => handleSelectChange("region", value)}
                     required
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REGION_CHOICES.map((region) => (
+                        <SelectItem key={region.value} value={region.value}>
+                          {region.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
