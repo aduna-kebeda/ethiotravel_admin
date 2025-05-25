@@ -3,23 +3,21 @@ import { apiRequest } from "./api"
 // Event type definition based on API response
 export interface Event {
   id: number
-  organizer:
-    | string
-    | {
-        id: string
-        username: string
-        email: string
-        first_name: string
-        last_name: string
-      }
+  organizer: string | {
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+  }
   title: string
   slug: string
   description: string
   category: string
   location: string
   address: string
-  latitude: string
-  longitude: string
+  latitude: string | null
+  longitude: string | null
   start_date: string
   end_date: string
   images: string

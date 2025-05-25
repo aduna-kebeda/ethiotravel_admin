@@ -11,6 +11,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const accessToken = localStorage.getItem("accessToken");
 
+  // For GET requests, we'll still try without a token first
   if (!accessToken && method !== "GET") {
     throw new Error("Authentication required");
   }
@@ -40,6 +41,18 @@ export async function apiRequest<T>(
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+      // Clear invalid auth data
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+      
+      // Redirect to login page
+      window.location.href = "/login";
+      throw new Error("Authentication required");
+    }
 
     if (response.status === 204) {
       return {} as T;

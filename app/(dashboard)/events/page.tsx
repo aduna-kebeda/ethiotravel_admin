@@ -49,7 +49,7 @@ export default function EventsPage() {
       if (statusFilter) filters.status = statusFilter
 
       const response = await eventApi.getAll(filters)
-      setEvents(response.results)
+      setEvents(response.results || [])
       setTotalEvents(response.count)
 
       // Calculate total pages (assuming 10 items per page)
@@ -57,6 +57,7 @@ export default function EventsPage() {
       setTotalPages(pages > 0 ? pages : 1)
     } catch (error) {
       console.error("Failed to fetch events:", error)
+      setEvents([])
       toast({
         title: "Error",
         description: "Failed to load events. Please try again.",
@@ -163,7 +164,7 @@ export default function EventsPage() {
               <div className="flex h-[300px] items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
               </div>
-            ) : events.length === 0 ? (
+            ) : (events?.length ?? 0) === 0 ? (
               <div className="flex h-[300px] flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
                 <div className="rounded-full bg-muted p-3">
                   <Calendar className="h-6 w-6 text-muted-foreground" />
