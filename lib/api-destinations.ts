@@ -31,24 +31,26 @@ export const destinationCategories = [
   { value: "natural", label: "Natural" },
   { value: "adventure", label: "Adventure" },
   { value: "religious", label: "Religious" },
-  { value: "urban", label: "Urban" },
-  { value: "rural", label: "Rural" },
   { value: "beach", label: "Beach" },
+  { value: "mountain", label: "Mountain" },
+  { value: "city", label: "City" },
+
 ]
 
 // Available regions in Ethiopia
 export const ethiopianRegions = [
   { value: "addis_ababa", label: "Addis Ababa" },
-  { value: "amhara", label: "Amhara" },
   { value: "afar", label: "Afar" },
+  { value: "amhara", label: "Amhara" },
   { value: "benishangul_gumuz", label: "Benishangul-Gumuz" },
-  { value: "dire_dawa", label: "Dire Dawa" },
+  { value: "diredawa", label: "Dire Dawa" },
   { value: "gambela", label: "Gambela" },
   { value: "harari", label: "Harari" },
   { value: "oromia", label: "Oromia" },
   { value: "sidama", label: "Sidama" },
   { value: "somali", label: "Somali" },
-  { value: "southern_nations", label: "Southern Nations" },
+  { value: "south_west", label: "South West" },
+  { value: "southern", label: "Southern" },
   { value: "tigray", label: "Tigray" },
 ]
 
