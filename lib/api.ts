@@ -165,6 +165,66 @@ export interface Package {
 
 // Format package data for API submission
 export function formatPackageData(data: any): Partial<Package> {
+  // Validate required fields
+  const requiredFields = [
+    'title', 'description', 'short_description', 'location', 'region',
+    'price', 'duration', 'duration_in_days', 'image', 'departure',
+    'departure_time', 'return_time', 'max_group_size', 'min_age',
+    'tour_guide', 'languages'
+  ];
+
+  const missingFields = requiredFields.filter(field => !data[field]);
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+  }
+
+  // Validate field lengths
+  if (data.title.length > 200) throw new Error('Title must be less than 200 characters');
+  if (data.short_description.length > 300) throw new Error('Short description must be less than 300 characters');
+  if (data.location.length > 100) throw new Error('Location must be less than 100 characters');
+  if (data.region.length > 100) throw new Error('Region must be less than 100 characters');
+  if (data.duration.length > 50) throw new Error('Duration must be less than 50 characters');
+  if (data.departure.length > 100) throw new Error('Departure location must be less than 100 characters');
+  if (data.tour_guide.length > 100) throw new Error('Tour guide name must be less than 100 characters');
+
+  // Validate numeric fields
+  if (isNaN(Number(data.price)) || Number(data.price) < 0) {
+    throw new Error('Price must be a positive number');
+  }
+  if (data.discounted_price && (isNaN(Number(data.discounted_price)) || Number(data.discounted_price) < 0)) {
+    throw new Error('Discounted price must be a positive number');
+  }
+  if (isNaN(Number(data.duration_in_days)) || Number(data.duration_in_days) < 1 || Number(data.duration_in_days) > 365) {
+    throw new Error('Duration in days must be between 1 and 365');
+  }
+  if (isNaN(Number(data.max_group_size)) || Number(data.max_group_size) < 1 || Number(data.max_group_size) > 1000) {
+    throw new Error('Maximum group size must be between 1 and 1000');
+  }
+  if (isNaN(Number(data.min_age)) || Number(data.min_age) < 0 || Number(data.min_age) > 120) {
+    throw new Error('Minimum age must be between 0 and 120');
+  }
+
+  // Validate difficulty level
+  const validDifficulties = ['Easy', 'Moderate', 'Challenging'];
+  if (!validDifficulties.includes(data.difficulty)) {
+    throw new Error('Invalid difficulty level');
+  }
+
+  // Validate status
+  const validStatuses = ['draft', 'active'];
+  if (!validStatuses.includes(data.status)) {
+    throw new Error('Invalid status');
+  }
+
+  // Validate coordinates format
+  if (data.coordinates) {
+    const coordPattern = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
+    if (!coordPattern.test(data.coordinates)) {
+      throw new Error('Invalid coordinates format. Use latitude,longitude (e.g. 12.0333,39.0333)');
+    }
+  }
+
+  // Format arrays and handle empty values
   let galleryImages = data.gallery_images;
   if (!galleryImages) {
     galleryImages = [];
@@ -172,15 +232,26 @@ export function formatPackageData(data: any): Partial<Package> {
     galleryImages = [galleryImages];
   }
 
+  // Format and validate arrays
+  const formatArray = (value: any, separator: string) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return value.split(separator).map((item: string) => item.trim()).filter(Boolean);
+  };
+
   return {
     ...data,
-    category: Array.isArray(data.category) ? data.category : [data.category],
-    included: Array.isArray(data.included) ? data.included : data.included.split(",").filter(Boolean),
-    not_included: Array.isArray(data.not_included) ? data.not_included : data.not_included.split(",").filter(Boolean),
-    itinerary: Array.isArray(data.itinerary) ? data.itinerary : data.itinerary.split(";").filter(Boolean),
-    languages: Array.isArray(data.languages) ? data.languages : data.languages.split(",").filter(Boolean),
-    coordinates: Array.isArray(data.coordinates) ? data.coordinates : data.coordinates.split(",").map(Number),
+    category: formatArray(data.category, ','),
+    included: formatArray(data.included, ','),
+    not_included: formatArray(data.not_included, ','),
+    itinerary: formatArray(data.itinerary, ';'),
+    languages: formatArray(data.languages, ','),
+    coordinates: data.coordinates ? data.coordinates.split(',').map(Number) : [],
     gallery_images: galleryImages,
+    price: String(Number(data.price).toFixed(2)),
+    discounted_price: data.discounted_price ? String(Number(data.discounted_price).toFixed(2)) : null,
+    featured: Boolean(data.featured),
+    status: data.status || 'draft',
   };
 }
 

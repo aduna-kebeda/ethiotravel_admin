@@ -18,16 +18,53 @@ import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, X } from "lucide-react"
 
+interface PackageFormData {
+  title: string;
+  category: string;
+  location: string;
+  region: string;
+  price: string;
+  discounted_price: string;
+  duration: string;
+  duration_in_days: number;
+  image: string;
+  gallery_images: string[];
+  featured: boolean;
+  status: string;
+  description: string;
+  short_description: string;
+  included: string;
+  not_included: string;
+  itinerary: string;
+  departure: string;
+  departure_time: string;
+  return_time: string;
+  max_group_size: number;
+  min_age: number;
+  difficulty: string;
+  tour_guide: string;
+  languages: string;
+  coordinates: string;
+  [key: string]: string | number | boolean | string[];
+}
+
+interface ValidationErrors {
+  [key: string]: string;
+}
+
 export default function NewPackagePage() {
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+  const [currentTab, setCurrentTab] = useState("basic")
+  const [lastErrorTime, setLastErrorTime] = useState<number>(0)
 
   // Form data state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PackageFormData>({
     title: "",
-    category: "Cultural",
+    category: "cultural",
     location: "",
     region: "Ethiopia",
     price: "",
@@ -35,7 +72,7 @@ export default function NewPackagePage() {
     duration: "",
     duration_in_days: 1,
     image: "",
-    gallery_images: [] as string[],
+    gallery_images: [],
     featured: false,
     status: "draft",
     description: "",
@@ -54,13 +91,115 @@ export default function NewPackagePage() {
     coordinates: "",
   })
 
+  const validateField = (name: string, value: any): string | null => {
+    switch (name) {
+      case 'title':
+        if (!value) return 'Title is required'
+        if (value.length > 200) return 'Title must be less than 200 characters'
+        return null
+      case 'short_description':
+        if (!value) return 'Short description is required'
+        if (value.length > 300) return 'Short description must be less than 300 characters'
+        return null
+      case 'description':
+        if (!value) return 'Description is required'
+        return null
+      case 'price':
+        if (!value) return 'Price is required'
+        if (isNaN(Number(value)) || Number(value) < 0) return 'Price must be a positive number'
+        return null
+      case 'discounted_price':
+        if (value && (isNaN(Number(value)) || Number(value) < 0)) return 'Discounted price must be a positive number'
+        if (value && Number(value) >= Number(formData.price)) return 'Discounted price must be less than regular price'
+        return null
+      case 'duration_in_days':
+        if (!value) return 'Duration is required'
+        if (value < 1 || value > 365) return 'Duration must be between 1 and 365 days'
+        return null
+      case 'max_group_size':
+        if (!value) return 'Maximum group size is required'
+        if (value < 1 || value > 1000) return 'Group size must be between 1 and 1000'
+        return null
+      case 'min_age':
+        if (!value) return 'Minimum age is required'
+        if (value < 0 || value > 120) return 'Minimum age must be between 0 and 120'
+        return null
+      case 'coordinates':
+        if (!value) return 'Coordinates are required'
+        const coordPattern = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/
+        if (!coordPattern.test(value)) return 'Invalid coordinates format. Use latitude,longitude (e.g. 12.0333,39.0333)'
+        return null
+      case 'location':
+        if (!value) return 'Location is required'
+        if (value.length > 100) return 'Location must be less than 100 characters'
+        return null
+      case 'region':
+        if (!value) return 'Region is required'
+        if (value.length > 100) return 'Region must be less than 100 characters'
+        return null
+      case 'departure':
+        if (!value) return 'Departure location is required'
+        if (value.length > 100) return 'Departure location must be less than 100 characters'
+        return null
+      case 'tour_guide':
+        if (!value) return 'Tour guide is required'
+        if (value.length > 100) return 'Tour guide name must be less than 100 characters'
+        return null
+      case 'languages':
+        if (!value) return 'Languages are required'
+        return null
+      case 'image':
+        if (!value) return 'Main image is required'
+        return null
+      default:
+        return null
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    let formattedValue = value
+
+    // Format price inputs
+    if (name === 'price' || name === 'discounted_price') {
+      formattedValue = value.replace(/[^\d.]/g, '')
+      const parts = formattedValue.split('.')
+      if (parts.length > 2) {
+        formattedValue = parts[0] + '.' + parts.slice(1).join('')
+      }
+      if (parts.length === 2 && parts[1].length > 2) {
+        formattedValue = parts[0] + '.' + parts[1].slice(0, 2)
+      }
+    }
+
+    // Format coordinates
+    if (name === 'coordinates') {
+      formattedValue = value.replace(/[^\d.,]/g, '')
+      const parts = formattedValue.split(',')
+      if (parts.length > 2) {
+        formattedValue = parts[0] + ',' + parts.slice(1).join('')
+      }
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: formattedValue }))
+    
+    // Clear error for this field when user starts typing
+    setValidationErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[name]
+      return newErrors
+    })
   }
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+    
+    // Clear error for this field when user makes a selection
+    setValidationErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[name]
+      return newErrors
+    })
   }
 
   const handleSwitchChange = (name: string, checked: boolean) => {
@@ -69,7 +208,25 @@ export default function NewPackagePage() {
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: Number.parseInt(value) || 0 }))
+    const numValue = parseInt(value) || 0
+
+    let validatedValue = numValue
+    if (name === 'duration_in_days') {
+      validatedValue = Math.min(Math.max(numValue, 1), 365)
+    } else if (name === 'max_group_size') {
+      validatedValue = Math.min(Math.max(numValue, 1), 1000)
+    } else if (name === 'min_age') {
+      validatedValue = Math.min(Math.max(numValue, 0), 120)
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: validatedValue }))
+    
+    // Clear error for this field when user starts typing
+    setValidationErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[name]
+      return newErrors
+    })
   }
 
   const handleMainImageUpload = (url: string) => {
@@ -110,69 +267,40 @@ export default function NewPackagePage() {
     setError(null)
 
     try {
-      // Validate required fields
-      if (!formData.title) throw new Error("Package title is required")
-      if (!formData.description) throw new Error("Package description is required")
-      if (!formData.short_description) throw new Error("Short description is required")
-      if (!formData.location) throw new Error("Location is required")
-      if (!formData.region) throw new Error("Region is required")
-      if (!formData.price) throw new Error("Price is required")
-      if (!formData.duration) throw new Error("Duration is required")
-      if (!formData.duration_in_days) throw new Error("Duration in days is required")
-      if (!formData.image) throw new Error("Main package image is required")
-      if (!formData.departure) throw new Error("Departure location is required")
-      if (!formData.departure_time) throw new Error("Departure time is required")
-      if (!formData.return_time) throw new Error("Return time is required")
-      if (!formData.max_group_size) throw new Error("Maximum group size is required")
-      if (!formData.min_age) throw new Error("Minimum age is required")
-      if (!formData.tour_guide) throw new Error("Tour guide is required")
-      if (!formData.languages) throw new Error("Languages are required")
-
-      // Validate field lengths
-      if (formData.title.length > 200) throw new Error("Title must be less than 200 characters")
-      if (formData.short_description.length > 300) throw new Error("Short description must be less than 300 characters")
-      if (formData.location.length > 100) throw new Error("Location must be less than 100 characters")
-      if (formData.region.length > 100) throw new Error("Region must be less than 100 characters")
-      if (formData.duration.length > 50) throw new Error("Duration must be less than 50 characters")
-      if (formData.departure.length > 100) throw new Error("Departure location must be less than 100 characters")
-      if (formData.tour_guide.length > 100) throw new Error("Tour guide name must be less than 100 characters")
-
-      // Validate numeric fields
-      if (isNaN(Number(formData.price)) || Number(formData.price) < 0) {
-        throw new Error("Price must be a positive number")
-      }
-      if (formData.discounted_price && (isNaN(Number(formData.discounted_price)) || Number(formData.discounted_price) < 0)) {
-        throw new Error("Discounted price must be a positive number")
-      }
-      if (isNaN(Number(formData.duration_in_days)) || Number(formData.duration_in_days) < 1) {
-        throw new Error("Duration in days must be a positive number")
-      }
-      if (isNaN(Number(formData.max_group_size)) || Number(formData.max_group_size) < 1) {
-        throw new Error("Maximum group size must be a positive number")
-      }
-      if (isNaN(Number(formData.min_age)) || Number(formData.min_age) < 0) {
-        throw new Error("Minimum age must be a non-negative number")
-      }
-
-      // Validate difficulty level
-      const validDifficulties = ["Easy", "Moderate", "Challenging"]
-      if (!validDifficulties.includes(formData.difficulty)) {
-        throw new Error("Invalid difficulty level")
-      }
-
-      // Validate status
-      const validStatuses = ["draft", "active"]
-      if (!validStatuses.includes(formData.status)) {
-        throw new Error("Invalid status")
+      // Validate discount price
+      if (formData.discounted_price && Number(formData.discounted_price) >= Number(formData.price)) {
+        throw new Error('Discounted price must be less than the regular price')
       }
 
       // Validate coordinates format
       if (formData.coordinates) {
         const coordPattern = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/
         if (!coordPattern.test(formData.coordinates)) {
-          throw new Error("Invalid coordinates format. Use latitude,longitude (e.g. 12.0333,39.0333)")
+          throw new Error('Invalid coordinates format. Use latitude,longitude (e.g. 12.0333,39.0333)')
         }
       }
+
+      // Validate required fields
+      const requiredFields = [
+        'title', 'description', 'short_description', 'location', 'region',
+        'price', 'duration', 'duration_in_days', 'image', 'departure',
+        'departure_time', 'return_time', 'max_group_size', 'min_age',
+        'tour_guide', 'languages'
+      ]
+
+      const missingFields = requiredFields.filter(field => !formData[field])
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
+      }
+
+      // Validate field lengths
+      if (formData.title.length > 200) throw new Error('Title must be less than 200 characters')
+      if (formData.short_description.length > 300) throw new Error('Short description must be less than 300 characters')
+      if (formData.location.length > 100) throw new Error('Location must be less than 100 characters')
+      if (formData.region.length > 100) throw new Error('Region must be less than 100 characters')
+      if (formData.duration.length > 50) throw new Error('Duration must be less than 50 characters')
+      if (formData.departure.length > 100) throw new Error('Departure location must be less than 100 characters')
+      if (formData.tour_guide.length > 100) throw new Error('Tour guide name must be less than 100 characters')
 
       // Format data for API
       const packageData = formatPackageData(formData)
@@ -202,6 +330,95 @@ export default function NewPackagePage() {
     }
   }
 
+  const validateTab = (tab: string): boolean => {
+    const errors: ValidationErrors = {}
+    let isValid = true
+
+    switch (tab) {
+      case "basic":
+        // Basic Info tab validation
+        const basicFields = [
+          'title', 'short_description', 'description', 'price', 'discounted_price',
+          'duration', 'duration_in_days', 'category', 'location', 'region', 'coordinates'
+        ]
+        for (const field of basicFields) {
+          const error = validateField(field, formData[field])
+          if (error) {
+            errors[field] = error
+            isValid = false
+            break
+          }
+        }
+        break
+
+      case "details":
+        // Details tab validation
+        const detailFields = [
+          'included', 'not_included', 'max_group_size', 'min_age',
+          'difficulty', 'tour_guide', 'languages'
+        ]
+        for (const field of detailFields) {
+          const error = validateField(field, formData[field])
+          if (error) {
+            errors[field] = error
+            isValid = false
+            break
+          }
+        }
+        break
+
+      case "itinerary":
+        // Itinerary tab validation
+        const itineraryFields = [
+          'itinerary', 'departure', 'departure_time', 'return_time'
+        ]
+        for (const field of itineraryFields) {
+          const error = validateField(field, formData[field])
+          if (error) {
+            errors[field] = error
+            isValid = false
+            break
+          }
+        }
+        break
+
+      case "media":
+        // Media tab validation
+        if (!formData.image) {
+          errors.image = 'Main image is required'
+          isValid = false
+        }
+        break
+    }
+
+    setValidationErrors(errors)
+    return isValid
+  }
+
+  const handleTabChange = (value: string) => {
+    // Clear previous errors
+    setValidationErrors({})
+    
+    // Validate current tab before allowing change
+    if (validateTab(currentTab)) {
+      setCurrentTab(value)
+    } else {
+      // Get the first error message
+      const firstError = Object.values(validationErrors)[0]
+      
+      // Prevent showing duplicate errors within 3 seconds
+      const now = Date.now()
+      if (now - lastErrorTime > 3000) {
+        toast({
+          title: "Required field missing",
+          description: firstError,
+          variant: "destructive",
+        })
+        setLastErrorTime(now)
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -218,7 +435,7 @@ export default function NewPackagePage() {
       )}
 
       <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="basic" className="space-y-4">
+        <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
@@ -242,7 +459,11 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. Historic Northern Ethiopia Tour"
                     required
+                    className={validationErrors.title ? "border-red-500" : ""}
                   />
+                  {validationErrors.title && (
+                    <p className="text-sm text-red-500">{validationErrors.title}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -256,7 +477,11 @@ export default function NewPackagePage() {
                     maxLength={150}
                     rows={2}
                     required
+                    className={validationErrors.short_description ? "border-red-500" : ""}
                   />
+                  {validationErrors.short_description && (
+                    <p className="text-sm text-red-500">{validationErrors.short_description}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -269,7 +494,11 @@ export default function NewPackagePage() {
                     placeholder="Detailed description of the package"
                     rows={5}
                     required
+                    className={validationErrors.description ? "border-red-500" : ""}
                   />
+                  {validationErrors.description && (
+                    <p className="text-sm text-red-500">{validationErrors.description}</p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -285,7 +514,11 @@ export default function NewPackagePage() {
                       step="0.01"
                       placeholder="e.g. 1200"
                       required
+                      className={validationErrors.price ? "border-red-500" : ""}
                     />
+                    {validationErrors.price && (
+                      <p className="text-sm text-red-500">{validationErrors.price}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -299,7 +532,11 @@ export default function NewPackagePage() {
                       min="0"
                       step="0.01"
                       placeholder="e.g. 1000"
+                      className={validationErrors.discounted_price ? "border-red-500" : ""}
                     />
+                    {validationErrors.discounted_price && (
+                      <p className="text-sm text-red-500">{validationErrors.discounted_price}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -313,7 +550,11 @@ export default function NewPackagePage() {
                       min="1"
                       placeholder="e.g. 7"
                       required
+                      className={validationErrors.duration_in_days ? "border-red-500" : ""}
                     />
+                    {validationErrors.duration_in_days && (
+                      <p className="text-sm text-red-500">{validationErrors.duration_in_days}</p>
+                    )}
                   </div>
                 </div>
 
@@ -326,7 +567,11 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. 7 days"
                     required
+                    className={validationErrors.duration ? "border-red-500" : ""}
                   />
+                  {validationErrors.duration && (
+                    <p className="text-sm text-red-500">{validationErrors.duration}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -336,12 +581,16 @@ export default function NewPackagePage() {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cultural">Cultural</SelectItem>
-                      <SelectItem value="Adventure">Adventure</SelectItem>
-                      <SelectItem value="Safari">Safari</SelectItem>
-                      <SelectItem value="Historical">Historical</SelectItem>
-                      <SelectItem value="Nature">Nature</SelectItem>
-                      <SelectItem value="Religious">Religious</SelectItem>
+                      <SelectItem value="cultural">Cultural</SelectItem>
+                      <SelectItem value="adventure">Adventure</SelectItem>
+                      <SelectItem value="safari">Safari</SelectItem>
+                      <SelectItem value="historical">Historical</SelectItem>
+                      <SelectItem value="nature">Nature</SelectItem>
+                      <SelectItem value="religious">Religious</SelectItem>
+                      <SelectItem value="beach">Beach</SelectItem>
+                      <SelectItem value="city">City</SelectItem>
+                      <SelectItem value="wildlife">Wildlife</SelectItem>
+                      <SelectItem value="hiking">Hiking</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -355,7 +604,11 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. Northern Ethiopia"
                     required
+                    className={validationErrors.location ? "border-red-500" : ""}
                   />
+                  {validationErrors.location && (
+                    <p className="text-sm text-red-500">{validationErrors.location}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -367,7 +620,11 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. Ethiopia"
                     required
+                    className={validationErrors.region ? "border-red-500" : ""}
                   />
+                  {validationErrors.region && (
+                    <p className="text-sm text-red-500">{validationErrors.region}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -379,7 +636,11 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. 12.0333,39.0333"
                     required
+                    className={validationErrors.coordinates ? "border-red-500" : ""}
                   />
+                  {validationErrors.coordinates && (
+                    <p className="text-sm text-red-500">{validationErrors.coordinates}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">Enter as latitude,longitude (e.g. 12.0333,39.0333)</p>
                 </div>
 
@@ -429,10 +690,14 @@ export default function NewPackagePage() {
                     placeholder="List items included in the package, separated by commas (e.g. Accommodation,Meals,Transportation)"
                     rows={5}
                     required
+                    className={validationErrors.included ? "border-red-500" : ""}
                   />
                   <p className="text-xs text-muted-foreground">
                     Separate items with commas (e.g. Accommodation,Meals,Transportation)
                   </p>
+                  {validationErrors.included && (
+                    <p className="text-sm text-red-500">{validationErrors.included}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -445,10 +710,14 @@ export default function NewPackagePage() {
                     placeholder="List items not included in the package, separated by commas (e.g. Flights,Visa fees,Personal expenses)"
                     rows={5}
                     required
+                    className={validationErrors.not_included ? "border-red-500" : ""}
                   />
                   <p className="text-xs text-muted-foreground">
                     Separate items with commas (e.g. Flights,Visa fees,Personal expenses)
                   </p>
+                  {validationErrors.not_included && (
+                    <p className="text-sm text-red-500">{validationErrors.not_included}</p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -463,7 +732,11 @@ export default function NewPackagePage() {
                       min="1"
                       placeholder="e.g. 12"
                       required
+                      className={validationErrors.max_group_size ? "border-red-500" : ""}
                     />
+                    {validationErrors.max_group_size && (
+                      <p className="text-sm text-red-500">{validationErrors.max_group_size}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -477,7 +750,11 @@ export default function NewPackagePage() {
                       min="0"
                       placeholder="e.g. 12"
                       required
+                      className={validationErrors.min_age ? "border-red-500" : ""}
                     />
+                    {validationErrors.min_age && (
+                      <p className="text-sm text-red-500">{validationErrors.min_age}</p>
+                    )}
                   </div>
                 </div>
 
@@ -506,7 +783,11 @@ export default function NewPackagePage() {
                     value={formData.tour_guide}
                     onChange={handleChange}
                     placeholder="e.g. Abebe Kebede"
+                    className={validationErrors.tour_guide ? "border-red-500" : ""}
                   />
+                  {validationErrors.tour_guide && (
+                    <p className="text-sm text-red-500">{validationErrors.tour_guide}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -518,8 +799,12 @@ export default function NewPackagePage() {
                     onChange={handleChange}
                     placeholder="e.g. English,Amharic"
                     required
+                    className={validationErrors.languages ? "border-red-500" : ""}
                   />
                   <p className="text-xs text-muted-foreground">Separate languages with commas (e.g. English,Amharic)</p>
+                  {validationErrors.languages && (
+                    <p className="text-sm text-red-500">{validationErrors.languages}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -542,10 +827,14 @@ export default function NewPackagePage() {
                     placeholder="Day-by-day breakdown, separated by semicolons (e.g. Day 1: Arrival;Day 2: Church tour)"
                     rows={8}
                     required
+                    className={validationErrors.itinerary ? "border-red-500" : ""}
                   />
                   <p className="text-xs text-muted-foreground">
                     Separate days with semicolons (e.g. Day 1: Arrival;Day 2: Church tour)
                   </p>
+                  {validationErrors.itinerary && (
+                    <p className="text-sm text-red-500">{validationErrors.itinerary}</p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -558,7 +847,11 @@ export default function NewPackagePage() {
                       onChange={handleChange}
                       placeholder="e.g. Addis Ababa"
                       required
+                      className={validationErrors.departure ? "border-red-500" : ""}
                     />
+                    {validationErrors.departure && (
+                      <p className="text-sm text-red-500">{validationErrors.departure}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -570,7 +863,11 @@ export default function NewPackagePage() {
                       onChange={handleChange}
                       type="time"
                       required
+                      className={validationErrors.departure_time ? "border-red-500" : ""}
                     />
+                    {validationErrors.departure_time && (
+                      <p className="text-sm text-red-500">{validationErrors.departure_time}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -582,7 +879,11 @@ export default function NewPackagePage() {
                       onChange={handleChange}
                       type="time"
                       required
+                      className={validationErrors.return_time ? "border-red-500" : ""}
                     />
+                    {validationErrors.return_time && (
+                      <p className="text-sm text-red-500">{validationErrors.return_time}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
